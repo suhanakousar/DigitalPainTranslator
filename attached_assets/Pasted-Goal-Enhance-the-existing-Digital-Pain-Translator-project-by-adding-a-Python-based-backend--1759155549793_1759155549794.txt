@@ -1,0 +1,37 @@
+Goal
+-----
+Enhance the existing Digital Pain Translator project by adding a Python-based backend (FastAPI) for improved inference and analysis, and integrate it cleanly with the React frontend. IMPORTANT: Do NOT include any example/demo data, sample payloads, prefilled JSON examples, or illustrative numeric values anywhere in the generated files. Where placeholder files are required, create them empty or include only format comments (no concrete example values). The generated code must be production-minded, secure, and include clear instructions for how to provide real training data and deploy models — but must not ship with example datasets or example payloads.
+
+High-level requirements
+-----------------------
+1. Implement a Python FastAPI server with:
+   - WebSocket endpoint for low-latency inference at `/ws/infer`.
+   - REST endpoint for one-shot inference at `POST /api/infer`.
+   - REST endpoints for record storage: `GET /api/records`, `POST /api/records`.
+   - Admin endpoints: `GET /api/health`, `POST /api/model/reload`.
+2. The server must accept either:
+   - landmark sequences (frames × landmarks × coordinates), OR
+   - precomputed features (mouthOpen, eyeClosureAvg, browFurrowAvg, headTiltVar, microMovementVar) plus caregiver inputs.
+   Implementation must include input validation and clear error handling.
+3. Provide a training pipeline (PyTorch) to train a sequence model from supplied datasets. Do NOT include any training data or example sequences. The code should include instructions on how to format and supply training data but must not contain example records.
+4. Provide explainability support:
+   - For baseline deterministic model: return per-feature contributions.
+   - For ML model: implement a gradient-based attribution fallback for runtime explainability (do not include SHAP data or precomputed attributions).
+5. Integrate with frontend:
+   - Add a toggle controlled UI element: `Local-only` vs `Server-assisted`.
+   - When `Server-assisted` is enabled, the frontend should send validated payloads to backend endpoints (landmarks or features) and handle responses conforming to the defined schema.
+6. Security & privacy:
+   - Default mode of the app must be local-only. Server-assisted mode must be opt-in with explicit consent recorded.
+   - For production, require TLS; document dev instructions for local testing.
+   - Do not store raw video by default. If storing landmarks is supported, document opt-in only and encryption recommendations.
+7. Deployment:
+   - Provide Dockerfile for backend (CPU-first) and a `docker-compose.yml` to run frontend + backend locally. Do not embed any example data or credentials.
+8. Tests:
+   - Include unit tests (pytest) for feature extraction logic, predictor wrapper, and inference endpoints using synthetic/generated test inputs created programmatically within tests (no example files).
+9. Documentation:
+   - README must explain how to supply real data, how to train and export models, API contracts (without concrete sample payloads), and privacy/consent requirements. Do NOT include sample payloads or example JSON.
+
+Deliverables & file structure
+-----------------------------
+Create or update the repository with the following structure and full implementation. Where files would normally contain sample/demo data, create empty placeholders or comment-only templates (no concrete examples).
+
