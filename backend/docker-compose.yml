@@ -1,0 +1,54 @@
+version: '3.8'
+
+services:
+  # Backend API service
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      - MODEL_PATH=/app/models/pain_assessment_model.pt
+      - BASELINE_WEIGHTS_PATH=/app/models/baseline_weights.json
+      - RECORDS_DB_PATH=/app/data/records.json
+    volumes:
+      # Mount models directory for persistence
+      - ./models:/app/models
+      - ./data:/app/data
+      # Mount demo_data for training (user supplies data)
+      - ./demo_data:/app/demo_data:ro
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    restart: unless-stopped
+    networks:
+      - pain-translator
+
+  # Frontend service (optional - can run separately)
+  frontend:
+    build:
+      context: ../client
+      dockerfile: Dockerfile
+    ports:
+      - "5000:5000"
+    environment:
+      - REACT_APP_BACKEND_URL=http://backend:8000
+      - REACT_APP_WS_URL=ws://backend:8000
+    depends_on:
+      backend:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - pain-translator
+
+networks:
+  pain-translator:
+    driver: bridge
+
+volumes:
+  models_data:
+  records_data:
