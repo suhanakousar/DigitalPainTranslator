@@ -1,0 +1,24 @@
+Generate a complete, runnable repository named `digital-pain-translator` that implements the Digital Pain Translator web app (frontend-first). This repo must be production-ready for a hackathon demo: full source files, tests, README, demo script, and deployment instructions. Output the repository as a folder structure with file contents. If your tool supports zipping or exporting a repo, produce it as a zip. Otherwise, print each file path followed by its exact contents.
+
+GOAL
+Create a privacy-first web app that estimates patient pain (0–10) by combining in-browser facial micro-expression features (face landmarks) with caregiver inputs (sliders/buttons). The app must run primarily in the browser, be accessible, include local storage & CSV export, show explainability, and ship with tests and a README. Use React + Vite + Tailwind CSS for frontend. Minimal methods; use React functional components and plain JS modules.
+
+ACCEPTANCE CRITERIA
+1. Runs in the browser (no raw video upload by default).  
+2. Webcam capture with face landmarks overlay (use MediaPipe Face Mesh or TensorFlow.js face-landmarks-detection).  
+3. Extract features over a 3–5 second window: mouthOpen, eyeClosureAvg, browFurrowAvg, headTiltVar, microMovementVar. Use normalized ranges.  
+4. Caregiver inputs: 3 sliders (grimace 0–5, breathing 0–5, restlessness 0–5) + quick gesture buttons (clench, point, shake).  
+5. Explainable inference using weighted linear model (weights provided below) → pain score 0–10 + confidence %.  
+6. Result UI: large pain score, confidence, top contributors, recommended actions with color-coded bands and action buttons.  
+7. Local storage of timestamped records and CSV export.  
+8. Consent modal before camera.  
+9. Unit tests for feature extraction & inference (Jest).  
+10. README, demo video script, sample demo clips instructions, deploy instructions (Vercel/Netlify).
+
+TECH STACK
+- Frontend: React (Vite) + Tailwind CSS
+- Face landmarks: use `@mediapipe/face_mesh` with `@mediapipe/camera_utils` OR `@tensorflow-models/face-landmarks-detection`. (Prefer whichever is simpler to set up in-browser in your environment.)
+- Optional backend: Node + Express (only for feature storage; must NOT accept raw video). Backend optional; frontend must be fully functional without it.
+- Tests: Jest + React Testing Library (unit tests for utilities).
+
+PROJECT STRUCTURE (generate all files below)
