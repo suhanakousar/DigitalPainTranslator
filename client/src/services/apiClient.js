@@ -1,315 +1,149 @@
-/**
- * REST API client for server-assisted pain assessment inference.
- * Handles communication with the FastAPI backend.
- */
+// client/src/utils/painInference.ts
+import type { FacialFeatures, CaregiverInput } from '@shared/schema';
+import apiClient from '@/services/apiClient';
 
-class APIClient {
-  constructor(baseURL = null) {
-    // Use environment variable or default to localhost
-    this.baseURL = baseURL || import.meta.env.VITE_BACKEND_URL || 'http://localhost:8000';
-    this.timeout = 10000; // 10 second timeout
-  }
+// Pain model weights
+const PAIN_MODEL_WEIGHTS = {
+  // Caregiver input weights
+  grimace: 2.8,
+  breathing: 2.2,
+  restlessness: 2.6,
 
-  /**
-   * Make HTTP request with error handling
-   */
-  async makeRequest(endpoint, options = {}) {
-    const url = `${this.baseURL}${endpoint}`;
-    
-    const defaultOptions = {
-      headers: {
-        'Content-Type': 'application/json',
-        ...options.headers
-      },
-      timeout: this.timeout,
-      ...options
-    };
+  // Gesture weights
+  clench: 1.5,
+  point: 1.0,
+  shake: 2.0,
 
-    try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), this.timeout);
-      
-      const response = await fetch(url, {
-        ...defaultOptions,
-        signal: controller.signal
-      });
-      
-      clearTimeout(timeoutId);
+  // Base bias
+  bias: -1.0,
+};
 
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.message || `HTTP ${response.status}: ${response.statusText}`);
-      }
+export interface PainAssessmentResult {
+  painScore: number;
+  confidence: number;
+  topContributors: string[];
+  recommendations: string[];
+}
 
-      return await response.json();
-    } catch (error) {
-      if (error.name === 'AbortError') {
-        throw new Error('Request timeout - server may be unavailable');
-      }
-      
-      // Network or parsing errors
-      throw new Error(`API request failed: ${error.message}`);
-    }
-  }
-
-  /**
-   * Perform pain assessment inference
-   */
-  async inferPainScore(requestData) {
-    return await this.makeRequest('/api/infer', {
-      method: 'POST',
-      body: JSON.stringify(requestData)
-    });
-  }
-
-  /**
-   * Perform batch inference on multiple requests
-   */
-  async batchInference(requests) {
-    return await this.makeRequest('/api/infer/batch', {
-      method: 'POST',
-      body: JSON.stringify(requests)
-    });
-  }
-
-  /**
-   * Get inference service status
-   */
-  async getInferenceStatus() {
-    return await this.makeRequest('/api/infer/status');
-  }
-
-  /**
-   * Create a new assessment record
-   */
-  async createRecord(recordData) {
-    return await this.makeRequest('/api/records', {
-      method: 'POST',
-      body: JSON.stringify(recordData)
-    });
-  }
-
-  /**
-   * Get assessment records with optional filtering
-   */
-  async getRecords(params = {}) {
-    const queryString = new URLSearchParams(params).toString();
-    const endpoint = queryString ? `/api/records?${queryString}` : '/api/records';
-    return await this.makeRequest(endpoint);
-  }
-
-  /**
-   * Get a specific record by ID
-   */
-  async getRecord(recordId) {
-    return await this.makeRequest(`/api/records/${recordId}`);
-  }
-
-  /**
-   * Delete a record by ID
-   */
-  async deleteRecord(recordId) {
-    return await this.makeRequest(`/api/records/${recordId}`, {
-      method: 'DELETE'
-    });
-  }
-
-  /**
-   * Get records statistics
-   */
-  async getRecordsStatistics() {
-    return await this.makeRequest('/api/records/stats/summary');
-  }
-
-  /**
-   * Export records with filtering
-   */
-  async exportRecords(params = {}) {
-    return await this.makeRequest('/api/records/export', {
-      method: 'POST',
-      body: JSON.stringify(params)
-    });
-  }
-
-  /**
-   * Health check
-   */
-  async healthCheck() {
-    return await this.makeRequest('/api/health');
-  }
-
-  /**
-   * Detailed health check
-   */
-  async detailedHealthCheck() {
-    return await this.makeRequest('/api/health/detailed');
-  }
-
-  /**
-   * Reload model
-   */
-  async reloadModel(modelPath = null, force = false) {
-    return await this.makeRequest('/api/model/reload', {
+export async function calculatePainScore(
+  facialFeatures: FacialFeatures,
+  caregiverInputs: CaregiverInput
+): Promise<PainAssessmentResult> {
+  try {
+    // Send data to backend for inference
+    const response = await apiClient.makeRequest('/api/infer/pain-score', {
       method: 'POST',
       body: JSON.stringify({
-        model_path: modelPath,
-        force: force
-      })
+        facialFeatures,
+        caregiverInputs,
+      }),
     });
-  }
 
-  /**
-   * Get model information
-   */
-  async getModelInfo() {
-    return await this.makeRequest('/api/model/info');
-  }
+    return response;
+  } catch (err) {
+    // Local fallback if backend is unavailable
+    const contributions: Record<string, number> = {};
 
-  /**
-   * Get service metrics
-   */
-  async getMetrics() {
-    return await this.makeRequest('/api/metrics');
-  }
+    // Add caregiver inputs
+    contributions['Grimace'] = caregiverInputs.grimace * PAIN_MODEL_WEIGHTS.grimace;
+    contributions['Breathing Pattern'] = caregiverInputs.breathing * PAIN_MODEL_WEIGHTS.breathing;
+    contributions['Restlessness'] = caregiverInputs.restlessness * PAIN_MODEL_WEIGHTS.restlessness;
 
-  /**
-   * Test server connectivity
-   */
-  async testConnection() {
-    try {
-      await this.healthCheck();
-      return { connected: true, error: null };
-    } catch (error) {
-      return { connected: false, error: error.message };
-    }
-  }
-
-  /**
-   * Validate request data before sending
-   */
-  validateInferenceRequest(requestData) {
-    const errors = [];
-
-    // Check that either landmarks or features are provided
-    if (!requestData.landmarks && !requestData.features) {
-      errors.push('Either landmarks or features must be provided');
-    }
-
-    if (requestData.landmarks && requestData.features) {
-      errors.push('Provide either landmarks OR features, not both');
-    }
-
-    // Validate caregiver inputs
-    if (!requestData.caregiverInputs) {
-      errors.push('Caregiver inputs are required');
-    } else {
-      const caregiver = requestData.caregiverInputs;
-      
-      if (typeof caregiver.grimace !== 'number' || caregiver.grimace < 0 || caregiver.grimace > 5) {
-        errors.push('Grimace must be a number between 0 and 5');
+    // Add gesture contributions
+    caregiverInputs.gestures?.forEach((gesture) => {
+      switch (gesture) {
+        case 'clench':
+          contributions['Hand Clenching'] = PAIN_MODEL_WEIGHTS.clench;
+          break;
+        case 'point':
+          contributions['Pointing Gesture'] = PAIN_MODEL_WEIGHTS.point;
+          break;
+        case 'shake':
+          contributions['Head Shaking'] = PAIN_MODEL_WEIGHTS.shake;
+          break;
       }
-      
-      if (typeof caregiver.breathing !== 'number' || caregiver.breathing < 0 || caregiver.breathing > 5) {
-        errors.push('Breathing must be a number between 0 and 5');
-      }
-      
-      if (typeof caregiver.restlessness !== 'number' || caregiver.restlessness < 0 || caregiver.restlessness > 5) {
-        errors.push('Restlessness must be a number between 0 and 5');
-      }
+    });
 
-      if (caregiver.gestures && !Array.isArray(caregiver.gestures)) {
-        errors.push('Gestures must be an array');
-      }
-    }
+    // Calculate total score
+    const totalScore =
+      Object.values(contributions).reduce((sum, val) => sum + val, 0) + PAIN_MODEL_WEIGHTS.bias;
 
-    // Validate features if provided
-    if (requestData.features) {
-      const features = requestData.features;
-      const requiredFeatures = ['mouthOpen', 'eyeClosureAvg', 'browFurrowAvg', 'headTiltVar', 'microMovementVar'];
-      
-      for (const feature of requiredFeatures) {
-        if (typeof features[feature] !== 'number' || features[feature] < 0 || features[feature] > 1) {
-          errors.push(`${feature} must be a number between 0 and 1`);
-        }
-      }
-    }
+    // Apply sigmoid to constrain to 0–10
+    const painScore = Math.max(
+      0,
+      Math.min(10, (1 / (1 + Math.exp(-totalScore))) * 10)
+    );
 
-    // Validate landmarks if provided
-    if (requestData.landmarks) {
-      if (!Array.isArray(requestData.landmarks)) {
-        errors.push('Landmarks must be an array');
-      } else {
-        for (let i = 0; i < requestData.landmarks.length; i++) {
-          const frame = requestData.landmarks[i];
-          if (!Array.isArray(frame)) {
-            errors.push(`Landmarks frame ${i} must be an array`);
-            continue;
-          }
-          
-          for (let j = 0; j < frame.length; j++) {
-            const landmark = frame[j];
-            if (!landmark || typeof landmark.x !== 'number' || typeof landmark.y !== 'number' || typeof landmark.z !== 'number') {
-              errors.push(`Landmark ${j} in frame ${i} must have x, y, z coordinates`);
-              break;
-            }
-          }
-        }
-      }
-    }
+    // Confidence based on consistency of signals
+    const nonZeroContributions = Object.values(contributions).filter((val) => val > 0.1);
+    const confidence = Math.min(
+      95,
+      Math.max(
+        45,
+        (nonZeroContributions.length / Object.keys(contributions).length) * 100
+      )
+    );
+
+    // Top 3 contributors
+    const sortedContributions = Object.entries(contributions)
+      .filter(([_, value]) => value > 0.1)
+      .sort(([, a], [, b]) => b - a)
+      .slice(0, 3)
+      .map(([name]) => name);
+
+    // Recommendations
+    const recommendations = generateRecommendations(painScore, sortedContributions);
 
     return {
-      valid: errors.length === 0,
-      errors: errors
-    };
-  }
-
-  /**
-   * Create a properly formatted inference request
-   */
-  createInferenceRequest(data) {
-    const request = {
-      session_id: data.session_id || crypto.randomUUID(),
-      caregiverInputs: data.caregiverInputs,
-      timestamp: new Date().toISOString()
-    };
-
-    if (data.landmarks) {
-      request.landmarks = data.landmarks;
-    } else if (data.features) {
-      request.features = data.features;
-    }
-
-    return request;
-  }
-
-  /**
-   * Handle server response and extract useful information
-   */
-  processInferenceResponse(response) {
-    return {
-      sessionId: response.session_id,
-      painScore: response.score,
-      confidence: response.confidence,
-      explanation: response.explanation,
-      recommendedActions: response.recommendedActions,
-      modelVersion: response.model_version,
-      processingTime: response.processing_ms,
-      
-      // Helper methods
-      isHighConfidence: () => response.confidence >= 0.7,
-      isHighPain: () => response.score >= 7.0,
-      isModeratePain: () => response.score >= 4.0 && response.score < 7.0,
-      isLowPain: () => response.score < 4.0,
-      
-      getTopContributors: (limit = 3) => 
-        response.explanation
-          .sort((a, b) => b.importance - a.importance)
-          .slice(0, limit)
+      painScore: Math.round(painScore * 10) / 10,
+      confidence: Math.round(confidence),
+      topContributors: sortedContributions,
+      recommendations,
     };
   }
 }
 
-// Create singleton instance
-const apiClient = new APIClient();
+function generateRecommendations(painScore: number, topContributors: string[]): string[] {
+  const recommendations: string[] = [];
 
-export default apiClient;
+  if (painScore < 3) {
+    recommendations.push('Continue monitoring patient comfort');
+    recommendations.push('Consider non-pharmacological interventions');
+  } else if (painScore < 6) {
+    recommendations.push('Consider mild pain management interventions');
+    recommendations.push('Assess need for positioning changes');
+    recommendations.push('Monitor breathing and comfort levels');
+  } else if (painScore < 8) {
+    recommendations.push('Administer prescribed pain medication');
+    recommendations.push('Contact healthcare provider for assessment');
+    recommendations.push('Consider immediate comfort measures');
+  } else {
+    recommendations.push('Urgent: Contact healthcare provider immediately');
+    recommendations.push('Administer emergency pain protocol if available');
+    recommendations.push('Document all observations and interventions');
+  }
+
+  if (topContributors.includes('Breathing Pattern')) {
+    recommendations.push('Focus on breathing support and positioning');
+  }
+  if (topContributors.includes('Restlessness')) {
+    recommendations.push('Consider environmental modifications for comfort');
+  }
+  if (topContributors.includes('Brow Furrowing')) {
+    recommendations.push('Assess for headache or concentration-related discomfort');
+  }
+
+  return recommendations.slice(0, 4);
+}
+
+export function getPainLevelColor(painScore: number): string {
+  if (painScore <= 3) return 'text-chart-1'; // Green
+  if (painScore <= 6) return 'text-chart-2'; // Yellow/Orange
+  return 'text-chart-3'; // Red
+}
+
+export function getPainLevelBgColor(painScore: number): string {
+  if (painScore <= 3) return 'bg-chart-1/10';
+  if (painScore <= 6) return 'bg-chart-2/10';
+  return 'bg-chart-3/10';
+}
