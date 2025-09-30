@@ -1,37 +1,25 @@
-# Dockerfile for Digital Pain Translator Backend
+# backend/Dockerfile
 FROM python:3.11-slim
 
-# Set working directory
 WORKDIR /app
 
-# Install system dependencies
-RUN apt-get update && apt-get install -y \
+# system deps for common Python packages, adjust if your project needs more
+RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
-    curl \
+    git \
+    ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy requirements and install Python dependencies
+# Copy requirements and source
 COPY requirements.txt .
+# prefer binary wheels where possible
+RUN pip install --upgrade pip setuptools wheel
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy application code
-COPY app/ ./app/
-COPY train.py eval.py ./
+COPY . .
 
-# Create directories for models and data
-RUN mkdir -p models data
-
-# Create non-root user for security
-RUN groupadd -r painapp && useradd -r -g painapp painapp
-RUN chown -R painapp:painapp /app
-USER painapp
-
-# Expose port
+# expose port your backend binds to (8000)
 EXPOSE 8000
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 \
-    CMD curl -f http://localhost:8000/api/health || exit 1
-
-# Run the application
+# adjust command to how you start your server, example for uvicorn:
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]

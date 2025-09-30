@@ -6,7 +6,7 @@
 class APIClient {
   constructor(baseURL = null) {
     // Use environment variable or default to localhost
-    this.baseURL = baseURL || process.env.REACT_APP_BACKEND_URL || 'http://localhost:8000';
+    this.baseURL = baseURL || import.meta.env.VITE_BACKEND_URL || 'http://localhost:8000';
     this.timeout = 10000; // 10 second timeout
   }
 

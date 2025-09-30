@@ -28,19 +28,34 @@ export default function MainInterface() {
   const [currentResult, setCurrentResult] = useState<PainAssessmentResult | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
 
-  // Auto-calculate pain score when we have both facial features and caregiver inputs
+  // Calculate pain score when we have both facial features and caregiver inputs
   useEffect(() => {
-    if (currentFacialFeatures && hasConsent) {
-      setIsProcessing(true);
-      // Simulate processing delay for better UX
-      const timer = setTimeout(() => {
-        const result = calculatePainScore(currentFacialFeatures, caregiverInputs);
-        setCurrentResult(result);
-        setIsProcessing(false);
-      }, 500);
+    let mounted = true;
 
-      return () => clearTimeout(timer);
+    async function processPainScore() {
+      if (currentFacialFeatures && hasConsent) {
+        setIsProcessing(true);
+        try {
+          const result = await calculatePainScore(currentFacialFeatures, caregiverInputs);
+          if (mounted) {
+            setCurrentResult(result);
+          }
+        } catch (error) {
+          console.error('Failed to process pain score:', error);
+          // You might want to show an error message to the user here
+        } finally {
+          if (mounted) {
+            setIsProcessing(false);
+          }
+        }
+      }
     }
+    
+    processPainScore();
+
+    return () => {
+      mounted = false;
+    };
   }, [currentFacialFeatures, caregiverInputs, hasConsent]);
 
   const handleConsentAccept = () => {

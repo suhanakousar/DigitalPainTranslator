@@ -12,7 +12,14 @@ class Settings:
     # Server configuration
     host: str = "0.0.0.0"
     port: int = 8000
-    allowed_origins: List[str] = ["http://localhost:5000", "http://127.0.0.1:5000"]
+    allowed_origins: List[str] = [
+        "http://localhost:5000",
+        "http://127.0.0.1:5000",
+        "http://localhost:5173",
+        "http://localhost:3000",
+        "http://127.0.0.1:5173",
+        "http://127.0.0.1:3000"
+    ]
     
     # Model configuration
     model_path: str = os.getenv("MODEL_PATH", "models/pain_assessment_model.pt")

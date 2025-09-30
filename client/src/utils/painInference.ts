@@ -1,13 +1,7 @@
 import type { FacialFeatures, CaregiverInput } from '@shared/schema';
+import { APIClient } from '@/services/apiClient';
 
-// Weighted linear model weights for pain estimation
-const PAIN_MODEL_WEIGHTS = {
-  // Facial feature weights
-  mouthOpen: 2.5,
-  eyeClosureAvg: 1.8,
-  browFurrowAvg: 3.2,
-  headTiltVar: 1.5,
-  microMovementVar: 2.0,
+const apiClient = new APIClient();
   
   // Caregiver input weights
   grimace: 2.8,
@@ -30,21 +24,21 @@ export interface PainAssessmentResult {
   recommendations: string[];
 }
 
-export function calculatePainScore(
+export async function calculatePainScore(
   facialFeatures: FacialFeatures,
   caregiverInputs: CaregiverInput
-): PainAssessmentResult {
-  // Calculate individual contributions
-  const contributions = {
-    'Mouth Opening': facialFeatures.mouthOpen * PAIN_MODEL_WEIGHTS.mouthOpen,
-    'Eye Closure': facialFeatures.eyeClosureAvg * PAIN_MODEL_WEIGHTS.eyeClosureAvg,
-    'Brow Furrowing': facialFeatures.browFurrowAvg * PAIN_MODEL_WEIGHTS.browFurrowAvg,
-    'Head Movement': facialFeatures.headTiltVar * PAIN_MODEL_WEIGHTS.headTiltVar,
-    'Micro Movements': facialFeatures.microMovementVar * PAIN_MODEL_WEIGHTS.microMovementVar,
-    'Grimacing': (caregiverInputs.grimace / 5) * PAIN_MODEL_WEIGHTS.grimace,
-    'Breathing Pattern': (caregiverInputs.breathing / 5) * PAIN_MODEL_WEIGHTS.breathing,
-    'Restlessness': (caregiverInputs.restlessness / 5) * PAIN_MODEL_WEIGHTS.restlessness,
-  };
+): Promise<PainAssessmentResult> {
+  try {
+    // Send data to backend for inference
+    const response = await apiClient.makeRequest('/api/infer/pain-score', {
+      method: 'POST',
+      body: JSON.stringify({
+        facialFeatures,
+        caregiverInputs
+      })
+    });
+
+    return response;
 
   // Add gesture contributions
   caregiverInputs.gestures.forEach(gesture => {
